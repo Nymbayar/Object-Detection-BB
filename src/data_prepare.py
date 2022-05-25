@@ -81,8 +81,8 @@ def preprocess_data(sample):
         shape `(num_objects,)`.
     """
     image = sample["image"]
-    bbox = sample["objects"]["bbox"]
-    class_id = tf.cast(sample["objects"]["label"], dtype=tf.int32)
+    bbox = sample["bbox"]
+    class_id = tf.cast(sample["label"], dtype=tf.int32)
 
     image, bbox = random_flip_horizontal(image, bbox)
     image, image_shape, _ = resize_and_pad_image(image)
