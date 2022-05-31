@@ -1,10 +1,9 @@
 import cv2
-from isort import file
 import numpy as np
 
 from matplotlib import pyplot as plt
-### Augmentation functions 
 
+### Augmentation functions 
 
 def augment_brightness_camera_images(image):
     
@@ -26,10 +25,10 @@ def trans_image(image,bb_boxes_f,trans_range):
 
     Trans_M = np.float32([[1,0,tr_x],[0,1,tr_y]])
     rows,cols,channels = image.shape
-    bb_boxes_f['x_mod'] = bb_boxes_f['x_mod']+tr_x
-    bb_boxes_f['y_mod'] = bb_boxes_f['y_mod']+tr_x
-    bb_boxes_f['width_mod'] = bb_boxes_f['width_mod']+tr_y
-    bb_boxes_f['height_mod'] = bb_boxes_f['height_mod']+tr_y
+    bb_boxes_f['xmin'] = bb_boxes_f['xmin']+tr_x
+    bb_boxes_f['xmax'] = bb_boxes_f['xmax']+tr_x
+    bb_boxes_f['ymin'] = bb_boxes_f['ymin']+tr_y
+    bb_boxes_f['ymax'] = bb_boxes_f['ymax']+tr_y
     
     image_tr = cv2.warpAffine(image,Trans_M,(cols,rows))
     
@@ -61,21 +60,20 @@ def stretch_image(img,bb_boxes_f,scale_range):
                    [0,img.shape[0]] ]
                    )
 
-
     M = cv2.getPerspectiveTransform(pts1,pts2)
     img = cv2.warpPerspective(img,M,(img.shape[1],img.shape[0]))
     img = np.array(img,dtype=np.uint8)
     
-    bb_boxes_f['x_mod'] = (bb_boxes_f['x_mod'] - p1[0])/(p2[0]-p1[0])*img.shape[1]
-    bb_boxes_f['y_mod'] = (bb_boxes_f['y_mod'] - p1[0])/(p2[0]-p1[0])*img.shape[1]
-    bb_boxes_f['width_mod'] = (bb_boxes_f['width_mod'] - p1[1])/(p3[1]-p1[1])*img.shape[0]
-    bb_boxes_f['height_mod'] = (bb_boxes_f['height_mod'] - p1[1])/(p3[1]-p1[1])*img.shape[0]
+    bb_boxes_f['xmin'] = (bb_boxes_f['xmin'] - p1[0])/(p2[0]-p1[0])*img.shape[1]
+    bb_boxes_f['xmax'] = (bb_boxes_f['xmax'] - p1[0])/(p2[0]-p1[0])*img.shape[1]
+    bb_boxes_f['ymin'] = (bb_boxes_f['ymin'] - p1[1])/(p3[1]-p1[1])*img.shape[0]
+    bb_boxes_f['ymax'] = (bb_boxes_f['ymax'] - p1[1])/(p3[1]-p1[1])*img.shape[0]
     
     return img,bb_boxes_f
 
 
 
-def get_image_name(df,ind,size=(600,600),augmentation = False,trans_range = 20,scale_range=20):
+def get_image_name(df,ind,size=(1024,1024),augmentation = False,trans_range = 20,scale_range=20):
     ### Get image by name
     
     file_name = df['img_name'][ind]
@@ -84,10 +82,6 @@ def get_image_name(df,ind,size=(600,600),augmentation = False,trans_range = 20,s
     
     img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
     img = cv2.resize(img,size)
-    name_str = file_name.split('/')
-    name_str = name_str[-1]
-    #print(name_str)
-    #print(file_name)
     bb_boxes = df[df['img_name'] == file_name].reset_index()
     img_size_post = np.shape(img)
     
@@ -96,11 +90,11 @@ def get_image_name(df,ind,size=(600,600),augmentation = False,trans_range = 20,s
         img,bb_boxes = stretch_image(img,bb_boxes,scale_range)
         img = augment_brightness_camera_images(img)
         
-    bb_boxes['x_mod'] = np.round(bb_boxes['x_mod']/img_size[1]*img_size_post[1])
-    bb_boxes['y_mod'] = np.round(bb_boxes['y_mod']/img_size[1]*img_size_post[1])
-    bb_boxes['width_mod'] = np.round(bb_boxes['width_mod']/img_size[0]*img_size_post[0])
-    bb_boxes['height_mod'] = np.round(bb_boxes['height_mod']/img_size[0]*img_size_post[0])
-    bb_boxes['Area'] = bb_boxes['width_mod'] * bb_boxes['height_mod'] 
+    bb_boxes['xmin'] = np.round(bb_boxes['xmin']/img_size[1]*img_size_post[1])
+    bb_boxes['xmax'] = np.round(bb_boxes['xmax']/img_size[1]*img_size_post[1])
+    bb_boxes['ymin'] = np.round(bb_boxes['ymin']/img_size[0]*img_size_post[0])
+    bb_boxes['ymax'] = np.round(bb_boxes['ymax']/img_size[0]*img_size_post[0])
+    bb_boxes['Area'] = (bb_boxes['xmax']- bb_boxes['xmin'])*(bb_boxes['ymax']- bb_boxes['ymin']) 
     #bb_boxes = bb_boxes[bb_boxes['Area']>400]
         
     
@@ -114,9 +108,9 @@ def get_mask_seg(img,bb_boxes_f):
     img_mask = np.zeros_like(img[:,:,0])
     for i in range(len(bb_boxes_f)):
         #plot_bbox(bb_boxes,i,'g')
-        bb_box_i = [bb_boxes_f.iloc[i]['x_mod'],bb_boxes_f.iloc[i]['y_mod'],
-                bb_boxes_f.iloc[i]['width_mod'],bb_boxes_f.iloc[i]['height_mod']]
-        img_mask[int(bb_box_i[1]):int(bb_box_i[3]),int(bb_box_i[0]):int(bb_box_i[2])]= 1.
+        bb_box_i = [int(bb_boxes_f.iloc[i]['xmin']),int(bb_boxes_f.iloc[i]['ymin']),
+                int(bb_boxes_f.iloc[i]['xmax']),int(bb_boxes_f.iloc[i]['ymax'])]
+        img_mask[bb_box_i[1]:bb_box_i[3],bb_box_i[0]:bb_box_i[2]]= 1.
         img_mask = np.reshape(img_mask,(np.shape(img_mask)[0],np.shape(img_mask)[1],1))
     return img_mask
 
@@ -140,10 +134,10 @@ def plot_im_mask(im,im_mask):
 def plot_bbox(bb_boxes,ind_bb,color='r',linewidth=2):
     ### Plot bounding box
     
-    bb_box_i = [bb_boxes.iloc[ind_bb]['x_mod'],
-                bb_boxes.iloc[ind_bb]['y_mod'],
-                bb_boxes.iloc[ind_bb]['width_mod'],
-                bb_boxes.iloc[ind_bb]['height_mod']]
+    bb_box_i = [bb_boxes.iloc[ind_bb]['xmin'],
+                bb_boxes.iloc[ind_bb]['ymin'],
+                bb_boxes.iloc[ind_bb]['xmax'],
+                bb_boxes.iloc[ind_bb]['ymax']]
     plt.plot([bb_box_i[0],bb_box_i[2],bb_box_i[2],
                   bb_box_i[0],bb_box_i[0]],
              [bb_box_i[1],bb_box_i[1],bb_box_i[3],
@@ -156,8 +150,8 @@ def plot_im_bbox(im,bb_boxes):
     for i in range(len(bb_boxes)):
         plot_bbox(bb_boxes,i,'g')
     
-        bb_box_i = [bb_boxes.iloc[i]['x_mod'],bb_boxes.iloc[i]['y_mod'],
-                bb_boxes.iloc[i]['width_mod'],bb_boxes.iloc[i]['height_mod']]
+        bb_box_i = [bb_boxes.iloc[i]['xmin'],bb_boxes.iloc[i]['ymin'],
+                bb_boxes.iloc[i]['xmax'],bb_boxes.iloc[i]['ymax']]
         plt.plot(bb_box_i[0],bb_box_i[1],'rs')
         plt.plot(bb_box_i[2],bb_box_i[3],'bs')
     plt.axis('off')
