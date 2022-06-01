@@ -1,3 +1,4 @@
 .devcontainer/*
 kaggle/*
 notebooks/*
+*.h5
