@@ -155,3 +155,32 @@ def plot_im_bbox(im,bb_boxes):
         plt.plot(bb_box_i[0],bb_box_i[1],'rs')
         plt.plot(bb_box_i[2],bb_box_i[3],'bs')
     plt.axis('off')
+
+
+
+def get_image_name_test(df,ind,size=(1024,1024),augmentation = False,trans_range = 20,scale_range=20):
+    ### Get image by name
+    
+    file_name = df['img_name'][ind]
+    img = cv2.imread(file_name)
+    img_size = np.shape(img)
+    
+    img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+    img = cv2.resize(img,size)
+    bb_boxes = df[df['img_name'] == file_name].reset_index()
+    img_size_post = np.shape(img)
+    
+    if augmentation == True:
+        img,bb_boxes = trans_image(img,bb_boxes,trans_range)
+        img,bb_boxes = stretch_image(img,bb_boxes,scale_range)
+        img = augment_brightness_camera_images(img)
+        
+    #bb_boxes['xmin'] = np.round(bb_boxes['xmin']/img_size[1]*img_size_post[1])
+    #bb_boxes['xmax'] = np.round(bb_boxes['xmax']/img_size[1]*img_size_post[1])
+    #bb_boxes['ymin'] = np.round(bb_boxes['ymin']/img_size[0]*img_size_post[0])
+    #bb_boxes['ymax'] = np.round(bb_boxes['ymax']/img_size[0]*img_size_post[0])
+    #bb_boxes['Area'] = (bb_boxes['xmax']- bb_boxes['xmin'])*(bb_boxes['ymax']- bb_boxes['ymin']) 
+    #bb_boxes = bb_boxes[bb_boxes['Area']>400]
+        
+    
+    return img

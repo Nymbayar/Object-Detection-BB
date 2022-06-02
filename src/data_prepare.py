@@ -126,18 +126,18 @@ def generate_train_batch(df,batch_size,augmentation:bool,img_size:tuple):
 #### Testing generator, generates augmented images
 def generate_test_batch(df,batch_size,img_size:tuple):
     batch_images = np.zeros((batch_size, img_size[0], img_size[1], 3))
-    batch_masks = np.zeros((batch_size, img_size[0], img_size[1], 1))
+    #batch_masks = np.zeros((batch_size, img_size[0], img_size[1], 1))
     while 1:
         for i_batch in range(batch_size):
             #i_line = np.random.randint(2000)
-            i_line = len(df)
-            name_str,img,bb_boxes = get_image_name(df,i_line,
+            i_line = len(df) -1 
+            img = get_image_name_test(df,i_line,
                                                    size=img_size,
                                                   augmentation=False,
                                                    trans_range=0,
                                                    scale_range=0
                                                   )
-            img_mask = get_mask_seg(img,bb_boxes)
+            #img_mask = get_mask_seg(img,bb_boxes)
             batch_images[i_batch] = img
-            batch_masks[i_batch] =img_mask
-        yield batch_images, batch_masks
+            #batch_masks[i_batch] =img_mask
+        yield batch_images
