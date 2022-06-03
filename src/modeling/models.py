@@ -75,20 +75,20 @@ def residual_block(blockInput, num_filters=16):
     return x
 
 
-def UEfficientNet(backbone:str,input_shape=(None, None, 3),dropout_rate=0.1):
+def UEfficientNet(weight:str,input_shape=(None, None, 3),dropout_rate=0.1):
 
     backbone_list = ['b0','b1','b2','b3','b4','b5','b6','b7']
 
     assert backbone in backbone_list, 'Backbone must be name of efficientnet model, Example: "b0","b1","b2", etc..'
     
 
-    backbone = tf.keras.applications.EfficientNetB4(weights=None,
+    backbone = tf.keras.applications.EfficientNetB4(weights=weight,
                             include_top=False,
                             input_shape=input_shape)
     input = backbone.input
     start_neurons = 16
 
-    conv4 = backbone.layers[len(backbone.layers) - 2].output
+    conv4 = backbone.layers[342].output
     conv4 = LeakyReLU(alpha=0.1)(conv4)
     pool4 = MaxPooling2D((2, 2))(conv4)
     pool4 = Dropout(dropout_rate)(pool4)
