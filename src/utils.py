@@ -184,3 +184,7 @@ def get_image_name_test(df,ind,size=(1024,1024),augmentation = False,trans_range
         
     
     return img
+
+
+
+

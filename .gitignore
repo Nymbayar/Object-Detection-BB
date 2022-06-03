@@ -2,3 +2,4 @@
 kaggle/*
 notebooks/*
 *.h5
+*.csv
