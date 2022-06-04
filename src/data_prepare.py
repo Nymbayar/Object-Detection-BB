@@ -141,3 +141,28 @@ def generate_test_batch(df,batch_size,img_size:tuple):
             batch_images[i_batch] = img
             #batch_masks[i_batch] =img_mask
         yield batch_images,batch_masks
+
+
+#### Training generator, generates augmented images
+def generate_val_batch(df,batch_size,augmentation:bool,img_size:tuple):
+    
+    batch_images = np.zeros((batch_size, img_size[0], img_size[1], 3))
+    batch_masks = np.zeros((batch_size, img_size[0], img_size[1], 1))
+    ###
+    images = []
+    masks = []
+    for i in range(len(df)):
+            #i_line = np.random.randint(len(df))
+            name_str,img,bb_boxes = get_image_name(df,i,
+                                                   size=img_size,
+                                                  augmentation=augmentation,
+                                                   trans_range=50,
+                                                   scale_range=50
+                                                  )
+            img_mask = get_mask_seg(img,bb_boxes)
+            #batch_images[i_batch] = img
+            #batch_masks[i_batch] =img_mask
+            images.append(img)
+            masks.append(img_mask)
+    return np.array(images), np.array(masks) 
+        
