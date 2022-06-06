@@ -1,6 +1,9 @@
 from ctypes.wintypes import BOOL
 import tensorflow as tf
 import numpy as np
+import cv2
+
+from random import shuffle
 
 from src.utils import *
 
@@ -121,7 +124,7 @@ def generate_train_batch(df,batch_size,augmentation:bool,img_size:tuple):
             img_mask = get_mask_seg(img,bb_boxes)
             batch_images[i_batch] = img
             batch_masks[i_batch] =img_mask
-        yield batch_images, batch_masks
+        yield batch_images, np.array(batch_masks)
         
 #### Testing generator, generates augmented images
 def generate_test_batch(df,batch_size,img_size:tuple):
@@ -166,3 +169,263 @@ def generate_val_batch(df,batch_size,augmentation:bool,img_size:tuple):
             masks.append(img_mask)
     return np.array(images), np.array(masks) 
         
+    
+
+def generator_main(samples,batch_size=32):
+    """
+    Yields the next training batch.
+    Suppose `samples` is an array [[image1_filename,label1], [image2_filename,label2],...].
+    """
+    num_samples = len(samples)
+    while True: # Loop forever so the generator never terminates
+        shuffle(samples)
+
+        # Get index to start each batch: [0, batch_size, 2*batch_size, ..., max multiple of batch_size <= num_samples]
+        for offset in range(0, num_samples, batch_size):
+            # Get the samples you'll use in this batch
+            batch_samples = samples[offset:offset+batch_size]
+
+            # Initialise X_train and y_train arrays for this batch
+            X_train = []
+            y_train = []
+
+            # For each example
+            for batch_sample in batch_samples:
+                # Load image (X) and label (y)
+                img_name = batch_sample[0]
+                label = batch_sample[1]
+                img = cv2.imread(img_name)
+                
+
+                # apply any kind of preprocessing
+                #img, label = hsv_aug(img,label)
+                label = label[:,:-1]
+
+                img_mask = get_mask_seg(img,label)
+                # Add example to arrays
+                X_train.append(img)
+                y_train.append(img_mask)
+
+            # Make sure they're numpy arrays (as opposed to lists)
+            X_train = np.array(X_train)
+            y_train = np.array(y_train)
+
+            # The generator-y part: yield the next training batch            
+            yield X_train, y_train
+
+
+def generator_hsv(samples,batch_size=32):
+    """
+    Yields the next training batch.
+    Suppose `samples` is an array [[image1_filename,label1], [image2_filename,label2],...].
+    """
+    num_samples = len(samples)
+    while True: # Loop forever so the generator never terminates
+        shuffle(samples)
+
+        # Get index to start each batch: [0, batch_size, 2*batch_size, ..., max multiple of batch_size <= num_samples]
+        for offset in range(0, num_samples, batch_size):
+            # Get the samples you'll use in this batch
+            batch_samples = samples[offset:offset+batch_size]
+
+            # Initialise X_train and y_train arrays for this batch
+            X_train = []
+            y_train = []
+
+            # For each example
+            for batch_sample in batch_samples:
+                # Load image (X) and label (y)
+                img_name = batch_sample[0]
+                label = batch_sample[1]
+                img = cv2.imread(img_name)
+                
+
+                # apply any kind of preprocessing
+                img, label = hsv_aug(img,label)
+
+                # image mask
+                img_mask = get_mask_seg(img,label)
+                # Add example to arrays
+                X_train.append(img)
+                y_train.append(img_mask)
+
+            # Make sure they're numpy arrays (as opposed to lists)
+            X_train = np.array(X_train)
+            y_train = np.array(y_train)
+
+            # The generator-y part: yield the next training batch            
+            yield X_train, y_train
+
+
+def generator_flip(samples,batch_size=32):
+    """
+    Yields the next training batch.
+    Suppose `samples` is an array [[image1_filename,label1], [image2_filename,label2],...].
+    """
+    num_samples = len(samples)
+    while True: # Loop forever so the generator never terminates
+        shuffle(samples)
+
+        # Get index to start each batch: [0, batch_size, 2*batch_size, ..., max multiple of batch_size <= num_samples]
+        for offset in range(0, num_samples, batch_size):
+            # Get the samples you'll use in this batch
+            batch_samples = samples[offset:offset+batch_size]
+
+            # Initialise X_train and y_train arrays for this batch
+            X_train = []
+            y_train = []
+
+            # For each example
+            for batch_sample in batch_samples:
+                # Load image (X) and label (y)
+                img_name = batch_sample[0]
+                label = batch_sample[1]
+                img = cv2.imread(img_name)
+                
+
+                # apply any kind of preprocessing
+                img, label = horizont_flip(img,label)
+
+                # Image mask
+                img_mask = get_mask_seg(img,label)
+                # Add example to arrays
+                X_train.append(img)
+                y_train.append(img_mask)
+
+            # Make sure they're numpy arrays (as opposed to lists)
+            X_train = np.array(X_train)
+            y_train = np.array(y_train)
+
+            # The generator-y part: yield the next training batch            
+            yield X_train, y_train
+
+
+def generator_scale(samples,batch_size=32):
+    """
+    Yields the next training batch.
+    Suppose `samples` is an array [[image1_filename,label1], [image2_filename,label2],...].
+    """
+    num_samples = len(samples)
+    while True: # Loop forever so the generator never terminates
+        shuffle(samples)
+
+        # Get index to start each batch: [0, batch_size, 2*batch_size, ..., max multiple of batch_size <= num_samples]
+        for offset in range(0, num_samples, batch_size):
+            # Get the samples you'll use in this batch
+            batch_samples = samples[offset:offset+batch_size]
+
+            # Initialise X_train and y_train arrays for this batch
+            X_train = []
+            y_train = []
+
+            # For each example
+            for batch_sample in batch_samples:
+                # Load image (X) and label (y)
+                img_name = batch_sample[0]
+                label = batch_sample[1]
+                img = cv2.imread(img_name)
+                
+
+                # apply any kind of preprocessing
+                img, label = scale(img,label)
+
+                img_mask = get_mask_seg(img,img_mask)
+
+                # Add example to arrays
+                X_train.append(img)
+                y_train.append(label)
+
+            # Make sure they're numpy arrays (as opposed to lists)
+            X_train = np.array(X_train)
+            y_train = np.array(y_train)
+
+            # The generator-y part: yield the next training batch            
+            yield X_train, y_train
+
+
+def generator_translate(samples,batch_size=32):
+    """
+    Yields the next training batch.
+    Suppose `samples` is an array [[image1_filename,label1], [image2_filename,label2],...].
+    """
+    num_samples = len(samples)
+    while True: # Loop forever so the generator never terminates
+        shuffle(samples)
+
+        # Get index to start each batch: [0, batch_size, 2*batch_size, ..., max multiple of batch_size <= num_samples]
+        for offset in range(0, num_samples, batch_size):
+            # Get the samples you'll use in this batch
+            batch_samples = samples[offset:offset+batch_size]
+
+            # Initialise X_train and y_train arrays for this batch
+            X_train = []
+            y_train = []
+
+            # For each example
+            for batch_sample in batch_samples:
+                # Load image (X) and label (y)
+                img_name = batch_sample[0]
+                label = batch_sample[1]
+                img = cv2.imread(img_name)
+                
+
+                # apply any kind of preprocessing
+                img, label = scale(img,label)
+
+                # image mask
+
+                img_mask = get_mask_seg(img,label)
+                # Add example to arrays
+                X_train.append(img)
+                y_train.append(img_mask)
+
+            # Make sure they're numpy arrays (as opposed to lists)
+            X_train = np.array(X_train)
+            y_train = np.array(y_train)
+
+            # The generator-y part: yield the next training batch            
+            yield X_train, y_train
+
+
+def generator_shear(samples,batch_size=32):
+    """
+    Yields the next training batch.
+    Suppose `samples` is an array [[image1_filename,label1], [image2_filename,label2],...].
+    """
+    num_samples = len(samples)
+    while True: # Loop forever so the generator never terminates
+        shuffle(samples)
+
+        # Get index to start each batch: [0, batch_size, 2*batch_size, ..., max multiple of batch_size <= num_samples]
+        for offset in range(0, num_samples, batch_size):
+            # Get the samples you'll use in this batch
+            batch_samples = samples[offset:offset+batch_size]
+
+            # Initialise X_train and y_train arrays for this batch
+            X_train = []
+            y_train = []
+
+            # For each example
+            for batch_sample in batch_samples:
+                # Load image (X) and label (y)
+                img_name = batch_sample[0]
+                label = batch_sample[1]
+                img = cv2.imread(img_name)
+                
+
+                # apply any kind of preprocessing
+                img, label = shear(img,label)
+
+                # image mask
+
+                img_mask = get_mask_seg(img,label)
+                # Add example to arrays
+                X_train.append(img)
+                y_train.append(img_mask)
+
+            # Make sure they're numpy arrays (as opposed to lists)
+            X_train = np.array(X_train)
+            y_train = np.array(y_train)
+
+            # The generator-y part: yield the next training batch            
+            yield X_train, y_train
