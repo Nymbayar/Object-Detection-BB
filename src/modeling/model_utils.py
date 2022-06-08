@@ -47,7 +47,7 @@ def get_iou_vector(A, B):
         iou = intersection / union
         
         # iou metrric is a stepwise approximation of the real iou over 0.5
-        iou = np.floor(max(0, (iou - 0.45)*20)) / 10
+        iou = np.floor(max(0, (iou - 0.5)*20)) / 10
         
         metric += iou
         
@@ -59,6 +59,9 @@ def get_iou_vector(A, B):
 def my_iou_metric(label, pred):
     # Tensorflow version
     return tf.py_function(get_iou_vector, [label, pred > 0.5], tf.float64)
+
+def my_iou_loss(label,pred):
+    return -1 * tf.py_function(get_iou_vector, [label,pred > 0.5],tf.float64)
 
 def my_iou_metric_2(label, pred):
     return tf.py_function(get_iou_vector, [label, pred >0], tf.float64)
@@ -149,7 +152,6 @@ def lovasz_hinge_flat(logits, labels):
     loss = tf.cond(tf.equal(tf.shape(logits)[0], 0),
                    lambda: tf.reduce_sum(logits) * 0.,
                    compute_loss,
-                   strict=True,
                    name="loss"
                    )
     return loss
@@ -175,3 +177,111 @@ def lovasz_loss(y_true, y_pred):
     logits = y_pred #Jiaxin
     loss = lovasz_hinge(logits, y_true, per_image = True, ignore = None)
     return loss
+
+
+epsilon = 1e-5
+smooth = 1
+
+def dsc(y_true, y_pred):
+    smooth = 1.
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f)
+    score = (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+    return score
+
+def dice_loss(y_true, y_pred):
+    loss = 1 - dsc(y_true, y_pred)
+    return loss
+
+def bce_dice_loss(y_true, y_pred):
+    loss = tf.keras.losses.binary_crossentropy(y_true, y_pred) + dice_loss(y_true, y_pred)
+    return loss
+
+def confusion(y_true, y_pred):
+    smooth=1
+    y_pred_pos = K.clip(y_pred, 0, 1)
+    y_pred_neg = 1 - y_pred_pos
+    y_pos = K.clip(y_true, 0, 1)
+    y_neg = 1 - y_pos
+    tp = K.sum(y_pos * y_pred_pos)
+    fp = K.sum(y_neg * y_pred_pos)
+    fn = K.sum(y_pos * y_pred_neg) 
+    prec = (tp + smooth)/(tp+fp+smooth)
+    recall = (tp+smooth)/(tp+fn+smooth)
+    return prec, recall
+
+def tp(y_true, y_pred):
+    smooth = 1
+    y_pred_pos = K.round(K.clip(y_pred, 0, 1))
+    y_pos = K.round(K.clip(y_true, 0, 1))
+    tp = (K.sum(y_pos * y_pred_pos) + smooth)/ (K.sum(y_pos) + smooth) 
+    return tp 
+
+def tn(y_true, y_pred):
+    smooth = 1
+    y_pred_pos = K.round(K.clip(y_pred, 0, 1))
+    y_pred_neg = 1 - y_pred_pos
+    y_pos = K.round(K.clip(y_true, 0, 1))
+    y_neg = 1 - y_pos 
+    tn = (K.sum(y_neg * y_pred_neg) + smooth) / (K.sum(y_neg) + smooth )
+    return tn 
+
+def tversky(y_true, y_pred):
+    y_true_pos = K.flatten(y_true)
+    y_pred_pos = K.flatten(y_pred)
+    true_pos = K.sum(y_true_pos * y_pred_pos)
+    false_neg = K.sum(y_true_pos * (1-y_pred_pos))
+    false_pos = K.sum((1-y_true_pos)*y_pred_pos)
+    alpha = 0.7
+    return (true_pos + smooth)/(true_pos + alpha*false_neg + (1-alpha)*false_pos + smooth)
+
+def tversky_loss(y_true, y_pred):
+    return 1 - tversky(y_true,y_pred)
+
+def focal_tversky(y_true,y_pred):
+    pt_1 = tversky(y_true, y_pred)
+    gamma = 0.75
+    return K.pow((1-pt_1), gamma)
+
+
+def merged_mask(masks):
+    """
+    merge mask into one and return merged mask
+    """
+    n= masks.shape[2]
+    
+    if n!=0:        
+        merged_mask = np.zeros((masks.shape[0], masks.shape[1]))
+        for i in range(n):
+            merged_mask+=masks[...,i]
+        merged_mask=np.asarray(merged_mask,dtype=np.uint8)   
+        return merged_mask
+    return masks[:,:,0]
+    
+
+def compute_iou(gt_mask, predict_mask):
+    """
+    Computes Intersection over Union score for two binary masks.
+    :param predict_mask: numpy array
+    :param gt_mask: numpy array
+    :type1 and type2 results are same
+    :return iou score:
+    """
+    if predict_mask.shape[2]==0:
+        return 0
+    mask1 = merged_mask(predict_mask)
+    mask2 = merged_mask(gt_mask)
+    
+    #type 1
+    intersection = np.sum((mask1 + mask2) > 1)
+    union = np.sum((mask1 + mask2) > 0)
+    iou_score = intersection / float(union)
+    #print("Iou 1 : ",iou_score)
+    
+    #type2
+    intersection = np.logical_and(mask1, mask2)#*
+    union = np.logical_or(mask1, mask2)# +
+    iou_score = np.sum(intersection) / np.sum(union)
+    #print("Iou 2 : ",iou_score)
+    return iou_score

@@ -149,7 +149,7 @@ val_gen = generator_main(val_samples,batch_size)
 
 smooth = 1.
 model_unet.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4), 
-              loss=bce_logdice_loss, metrics=[my_iou_metric])
+              loss=focal_tversky, metrics=[my_iou_metric])
 
 
 steps_per_epoch = int(4 *len(train_df) / batch_size)
