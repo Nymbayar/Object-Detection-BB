@@ -17,7 +17,7 @@ from keras import backend as K
 from scipy.ndimage.measurements import label
 from keras_unet_collection import models
 from itertools import chain
-
+from sklearn.model_selection import StratifiedKFold, KFold, train_test_split
 
 
 from src.data_prepare import *
@@ -49,7 +49,7 @@ class GerConfig(Config):
     # GPU because the images are small. Batch size is 8 (GPUs * images/GPU).
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
- 
+
     # Number of classes (including background)
     NUM_CLASSES = 2  # background + 3 shapes
  
@@ -58,7 +58,9 @@ class GerConfig(Config):
     IMAGE_MIN_DIM = 1024
     IMAGE_MAX_DIM = 1024
 
-    DETECTION_MIN_CONFIDENCE = 0.95
+    #RPN_NMS_THRESHOLD = 0.85
+
+    DETECTION_MIN_CONFIDENCE = 0.85
     DETECTION_NMS_THRESHOLD = 0.0
  
     # Use smaller anchors because our image and objects are small
@@ -66,26 +68,24 @@ class GerConfig(Config):
  
     # Reduce training ROIs per image because the images are small and have
     # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
-    DETECTION_MAX_INSTANCES = 20
+    DETECTION_MAX_INSTANCES = 25
  
     # Use a small epoch since the data is simple
 
     BATCH_SIZE = 8
-    STEPS_PER_EPOCH = 6000 // BATCH_SIZE
+    STEPS_PER_EPOCH = len(os.listdir('kaggle/train/labels/')) // BATCH_SIZE
  
     # use small validation steps since the epoch is small
-    VALIDATION_STEPS = len(os.listdir('kaggle/val/images/')) // BATCH_SIZE
+    VALIDATION_STEPS = 500#len(os.listdir('kaggle/val/images/')) // BATCH_SIZE
  
  
 config = GerConfig()
 config.display()
 
-# Create model in training mode
-model = modellib.MaskRCNN(mode="training", config=config,
-                          model_dir=MODEL_DIR)
 
 
-
+#model.load_weights(filepath="logs/ger20220608T0559/mask_rcnn_ger_0041.h5", 
+#                   by_name=True)
 
 class GerDataset(utils.Dataset):
 
@@ -146,17 +146,89 @@ class GerDataset(utils.Dataset):
         return boxes, width, height
 
 
-train_dataset = GerDataset()
-train_dataset.load_dataset(dataset_dir='kaggle/train')
-train_dataset.prepare()
+############################################################
+#  K-fold cross validation
+############################################################
 
 
-val_dataset = GerDataset()
-val_dataset.load_dataset(dataset_dir='kaggle/val')
-val_dataset.prepare()
+    def load_custom_K_fold(self,subset,dataset_dir, fold):
+        # Add classes
+        self.add_class("dataset", 1, "ger")
 
-model.train(train_dataset=train_dataset, 
-            val_dataset=val_dataset, 
-            learning_rate=1e-4, 
-            epochs=50, 
-            layers='heads')
+
+        N_Folds = 5
+
+        images_dir = dataset_dir + '/images/'
+        annotations_dir = dataset_dir + '/labels/'
+
+        filename_list = []
+        for filename in os.listdir(images_dir):
+            
+            if len(re.findall('sca',filename)) == 1 or len(re.findall('tra',filename)) == 1 or  len(re.findall('she',filename)) == 1:
+                
+                continue
+            else:
+            
+                image_id = filename[:-4]
+                
+
+                img_path = images_dir + filename
+                ann_path = annotations_dir + image_id + '.txt'
+                filename_list.append(filename)
+
+            #self.add_image('dataset', image_id=image_id, path=img_path, annotation=ann_path)
+
+        k_fold = KFold(n_splits = N_Folds, random_state = 42, shuffle = True)
+
+        le_list = []
+
+        for i, (train, val) in enumerate(k_fold.split(filename_list)):
+                if subset == 'train' and fold == i:
+                    for index in train:
+                        le_list.append(filename_list[index])
+                elif subset == 'val' and fold == i:
+                    for index in val:
+                        le_list.append(filename_list[index])
+        
+
+        for filename in le_list:
+            
+            if len(re.findall('sca',filename)) == 1 or len(re.findall('tra',filename)) == 1 or  len(re.findall('she',filename)) == 1:
+                
+                continue
+            else:
+            
+                image_id = filename[:-4]
+                
+
+                img_path = images_dir + filename
+                ann_path = annotations_dir + image_id + '.txt'
+
+            self.add_image('dataset', image_id=image_id, path=img_path, annotation=ann_path)
+
+for i in range(5):
+
+    path = f"logs/fold_{i}"
+
+    os.makedirs(path)
+
+    # Create model in training mode
+    model = modellib.MaskRCNN(mode="training", config=config,
+                          model_dir=path)
+
+    
+    train_dataset = GerDataset()
+    train_dataset.load_custom_K_fold(dataset_dir='kaggle/train',subset="train",fold=i)
+    train_dataset.prepare()
+
+
+    val_dataset = GerDataset()
+    val_dataset.load_custom_K_fold(dataset_dir='kaggle/train',subset="val",fold=i)
+    val_dataset.prepare()
+
+    print('Training Network')
+    model.train(train_dataset=train_dataset, 
+                val_dataset=val_dataset, 
+                learning_rate=1e-4, 
+                epochs=80, 
+                layers='all')
