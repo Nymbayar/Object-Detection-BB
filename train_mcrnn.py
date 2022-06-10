@@ -5,6 +5,7 @@ import re
 import pandas as pd
 import os
 import cv2
+import imgaug
 
 from PIL import Image
 from tqdm import tqdm
@@ -60,24 +61,24 @@ class GerConfig(Config):
 
     #RPN_NMS_THRESHOLD = 0.85
 
-    DETECTION_MIN_CONFIDENCE = 0.85
-    DETECTION_NMS_THRESHOLD = 0.0
+    DETECTION_MIN_CONFIDENCE = 0.95
+    #DETECTION_NMS_THRESHOLD = 0.0
  
     # Use smaller anchors because our image and objects are small
-    RPN_ANCHOR_SCALES = (32, 64, 128, 256, 512)  # anchor side in pixels
- 
+    #RPN_ANCHOR_SCALES = (64, 128, 256, 512, 1024)  # anchor side in pixels
+
     # Reduce training ROIs per image because the images are small and have
     # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
-    DETECTION_MAX_INSTANCES = 25
- 
+    #DETECTION_MAX_INSTANCES = 60
+    #TRAIN_ROIS_PER_IMAGE = 200
     # Use a small epoch since the data is simple
 
     BATCH_SIZE = 8
     STEPS_PER_EPOCH = len(os.listdir('kaggle/train/labels/')) // BATCH_SIZE
- 
+
     # use small validation steps since the epoch is small
-    VALIDATION_STEPS = 500#len(os.listdir('kaggle/val/images/')) // BATCH_SIZE
- 
+    VALIDATION_STEPS = 616#len(os.listdir('kaggle/val/images/')) // BATCH_SIZE
+
  
 config = GerConfig()
 config.display()
@@ -111,7 +112,7 @@ class GerDataset(utils.Dataset):
 
             self.add_image('dataset', image_id=image_id, path=img_path, annotation=ann_path)
 
-    # Loads the binary masks for an image.
+    # Loads the binary masks for an image.  
     def load_mask(self, image_id):
         info = self.image_info[image_id]
         path = info['annotation']
@@ -156,7 +157,7 @@ class GerDataset(utils.Dataset):
         self.add_class("dataset", 1, "ger")
 
 
-        N_Folds = 5
+        N_Folds = 4
 
         images_dir = dataset_dir + '/images/'
         annotations_dir = dataset_dir + '/labels/'
@@ -206,7 +207,7 @@ class GerDataset(utils.Dataset):
 
             self.add_image('dataset', image_id=image_id, path=img_path, annotation=ann_path)
 
-for i in range(5):
+for i in range(4):
 
     path = f"logs/fold_{i}"
 
@@ -221,7 +222,6 @@ for i in range(5):
     train_dataset.load_custom_K_fold(dataset_dir='kaggle/train',subset="train",fold=i)
     train_dataset.prepare()
 
-
     val_dataset = GerDataset()
     val_dataset.load_custom_K_fold(dataset_dir='kaggle/train',subset="val",fold=i)
     val_dataset.prepare()
@@ -230,5 +230,14 @@ for i in range(5):
     model.train(train_dataset=train_dataset, 
                 val_dataset=val_dataset, 
                 learning_rate=1e-4, 
-                epochs=80, 
-                layers='all')
+                epochs=30, 
+                layers='heads'
+                )
+
+    print('Training All Layers')
+    model.train(train_dataset=train_dataset, 
+                val_dataset=val_dataset, 
+                learning_rate=1e-4, 
+                epochs=50, 
+                layers='all'
+                )
