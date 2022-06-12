@@ -1270,8 +1270,17 @@ def load_image_gt(dataset, config, image_id, augmentation=None):
         det = augmentation.to_deterministic()
         image = det.augment_image(image)
         # Change mask to np.uint8 because imgaug doesn't support np.bool
+        #mask = det.augment_image(mask.astype(np.uint8),
+        #                         hooks=imgaug.HooksImages(activator=hook))
         mask = det.augment_image(mask.astype(np.uint8),
-                                 hooks=imgaug.HooksImages(activator=hook))
+        hooks=imgaug.HooksImages(activator=hook)) 
+#        if mask_shape[-1] == 1:
+#            mask = det.augment_image(mask.astype(np.uint8),
+#                                         hooks=imgaug.HooksImages(activator=hook)) 
+#        else:
+#            mask = det.augment_images(mask.astype(np.uint8),
+#                                         hooks=imgaug.HooksImages(activator=hook))
+#                                         
         # Verify that shapes didn't change
         assert image.shape == image_shape, "Augmentation shouldn't change image size"
         assert mask.shape == mask_shape, "Augmentation shouldn't change mask size"
@@ -2344,7 +2353,7 @@ class MaskRCNN(object):
                                         histogram_freq=0, write_graph=True, write_images=False),
             keras.callbacks.ModelCheckpoint(self.checkpoint_path,
                                             verbose=0, save_weights_only=True),
-            keras.callbacks.EarlyStopping(monitor='val_loss',patience=int(8),min_delta=0.01,mode='min',restore_best_weights=True
+            keras.callbacks.EarlyStopping(monitor='val_loss',patience=int(12),min_delta=0.01,mode='min',restore_best_weights=True
 )
         ]
 

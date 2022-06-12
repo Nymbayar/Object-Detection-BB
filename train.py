@@ -149,14 +149,14 @@ val_gen = generator_main(val_samples,batch_size)
 
 smooth = 1.
 model_unet.compile(optimizer=tf.keras.optimizers.Adam(lr=1e-4), 
-              loss=focal_tversky, metrics=[my_iou_metric])
+              loss=bce_logdice_loss, metrics=[my_iou_metric])
 
 
 steps_per_epoch = int(4 *len(train_df) / batch_size)
 val_per_epoch = int(len(val_df) / batch_size)
 custom_early_stopping = tf.keras.callbacks.EarlyStopping(
     monitor='val_loss',
-    patience=int(3),
+    patience=int(6),
     min_delta=0.01,
     mode='min',
     restore_best_weights=True
@@ -166,12 +166,12 @@ history = model_unet.fit(main_generator,
                         validation_data=val_gen,
                         validation_steps=val_per_epoch,
                             steps_per_epoch=steps_per_epoch,
-                            epochs=30,
+                            epochs=80,
                             callbacks=[custom_early_stopping]
                             )
 
 
-model_unet.save('object_unet_0606_aug.h5')
+model_unet.save('object_unet_0612.h5')
 
 K.clear_session()
 

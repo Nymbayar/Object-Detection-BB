@@ -62,7 +62,7 @@ class GerConfig(Config):
 
     #RPN_NMS_THRESHOLD = 0.85
 
-    DETECTION_MIN_CONFIDENCE = 0.9
+    DETECTION_MIN_CONFIDENCE = 0.95
     #DETECTION_NMS_THRESHOLD = 0.0
  
     # Use smaller anchors because our image and objects are small
@@ -71,7 +71,7 @@ class GerConfig(Config):
     # Reduce training ROIs per image because the images are small and have
     # few objects. Aim to allow ROI sampling to pick 33% positive ROIs.
     #DETECTION_MAX_INSTANCES = 60
-    TRAIN_ROIS_PER_IMAGE = 64
+    TRAIN_ROIS_PER_IMAGE = 32
     RPN_ANCHOR_RATIOS = [0.25, 1, 4]
     # Use a small epoch since the data is simple
 
@@ -149,30 +149,86 @@ class GerDataset(utils.Dataset):
         return boxes, width, height
 
 
+############################################################
+#  K-fold cross validation
+############################################################
 
-# Create model in training mode
-model = modellib.MaskRCNN(mode="training", config=config,
-                        model_dir=MODEL_DIR)
+
+    def load_custom_K_fold(self,subset,dataset_dir, fold):
+        # Add classes
+        self.add_class("dataset", 1, "ger")
 
 
-train_dataset = GerDataset()
-train_dataset.load_dataset(dataset_dir='kaggle/train')
-train_dataset.prepare()
+        N_Folds = 2
 
-val_dataset = GerDataset()
-val_dataset.load_dataset(dataset_dir='kaggle/val')
-val_dataset.prepare()
+        images_dir = dataset_dir + '/images/'
+        annotations_dir = dataset_dir + '/labels/'
 
-aug = iaa.Sometimes(0.8,iaa.MultiplyHueAndSaturation((0.5, 1.5), per_channel=True))
+        filename_list = []
+        for filename in os.listdir(images_dir):
+            
+            
+                image_id = filename[:-4]
+                
 
-print('Training Network')
-model.train(train_dataset=train_dataset, 
-            val_dataset=val_dataset, 
-            learning_rate=1e-4, 
-            epochs=120, 
-            layers='heads',
-            augmentation=aug
-            )
+                img_path = images_dir + filename
+                ann_path = annotations_dir + image_id + '.txt'
+                filename_list.append(filename)
+
+            #self.add_image('dataset', image_id=image_id, path=img_path, annotation=ann_path)
+
+        k_fold = KFold(n_splits = N_Folds, random_state = 42, shuffle = True)
+
+        le_list = []
+
+        for i, (train, val) in enumerate(k_fold.split(filename_list)):
+                if subset == 'train' and fold == i:
+                    for index in train:
+                        le_list.append(filename_list[index])
+                elif subset == 'val' and fold == i:
+                    for index in val:
+                        le_list.append(filename_list[index])
+        
+
+        for filename in le_list:
+            
+            
+                image_id = filename[:-4]
+                
+
+                img_path = images_dir + filename
+                ann_path = annotations_dir + image_id + '.txt'
+
+                self.add_image('dataset', image_id=image_id, path=img_path, annotation=ann_path)
+
+for i in range(2):
+
+    path = f"logs/fold_{i}"
+
+    os.makedirs(path)
+
+    # Create model in training mode
+    model = modellib.MaskRCNN(mode="training", config=config,
+                          model_dir=path)
+
+    
+    train_dataset = GerDataset()
+    train_dataset.load_custom_K_fold(dataset_dir='kaggle/train',subset="train",fold=i)
+    train_dataset.prepare()
+
+    val_dataset = GerDataset()
+    val_dataset.load_custom_K_fold(dataset_dir='kaggle/train',subset="val",fold=i)
+    val_dataset.prepare()
+
+    aug = iaa.SomeOf((0, 1), [iaa.GaussianBlur(sigma=(0.0, 5.0)),iaa.Fliplr(0,5)])
+
+    print('Training Network')
+    model.train(train_dataset=train_dataset, 
+                val_dataset=val_dataset, 
+                learning_rate=1e-4, 
+                epochs=100, 
+                layers='heads'
+                )
 
 #    print('Training All Layers')
 #    model.train(train_dataset=train_dataset, 
